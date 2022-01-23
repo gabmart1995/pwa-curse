@@ -1,20 +1,12 @@
 self.addEventListener('fetch', event => {
 
-    /*if ( event.request.url.includes('style.css') ) {
-        event.respondWith( null );
-    
-    } else {
-        event.respondWith( fetch( event.request ) );
+    let request = fetch( event.request )
+        .then( response => {
 
-    } */
+            // console.log( response );
 
-    if ( event.request.url.includes('.jpg') ) {
-        
-        // let fotoRequest = fetch( event.request.url );
-        
-        let fotoRequest = fetch( event.request );
-        event.respondWith( fotoRequest ); 
-    }
+            return response.ok ? response : fetch('img/main.jpg'); 
+        });
 
-    // event.respondWith( fetch( event.request ) );
+   event.respondWith( request );
 });
