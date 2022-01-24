@@ -4,10 +4,12 @@ const APP_SHELL = {
     CACHE_NAME: 'cache-v1',
     CACHE_STATIC: 'static-v2',
     CACHE_DYNAMIC: 'dynamic-v1',
-    CACHE_INMUTABLE: 'inmutable-v1'
+    CACHE_INMUTABLE: 'inmutable-v1',
+    CACHE_DYNAMIC_LIMIT: 50
 };
 
-async function cleanCache( cacheName, numberItems ) {
+// implementacion  ES7
+/*async function cleanCache( cacheName, numberItems ) {
 
     const cache = await caches.open( cacheName );
     const keys = await cache.keys();
@@ -20,10 +22,10 @@ async function cleanCache( cacheName, numberItems ) {
         
         cleanCache( cacheName, numberItems );
     }
-}
+}*/
 
 // implementacion ES5
-/* function cleanCache( cacheName, numberItems ) {
+function cleanCache( cacheName, numberItems ) {
 
     caches.open( cacheName ).then( cache => {
         
@@ -37,7 +39,7 @@ async function cleanCache( cacheName, numberItems ) {
             }
         });
     });
-}*/
+}
 
 self.addEventListener('install', event => {
     
@@ -47,10 +49,12 @@ self.addEventListener('install', event => {
 
             const files = [
                 './',
+                // '/favicon.ico',
                 './index.html',
                 './css/style.css',
                 './img/main.jpg',
-                './js/app.js'
+                './js/app.js',
+                './img/no-img.jpg'
             ];
 
             // debe devolver una promesa
@@ -73,7 +77,7 @@ self.addEventListener('fetch', event => {
     // event.respondWith( caches.match( event.request ) );
 
     // 2. cache with network fallback: busca los archivos en el cache, sino accede a la web
-    const cacheNetwork = caches.match( event.request )
+    /*const cacheNetwork = caches.match( event.request )
         .then( response => {
 
             console.log( event.request );
@@ -97,7 +101,112 @@ self.addEventListener('fetch', event => {
             });
         });
 
-    event.respondWith( cacheNetwork );
+    event.respondWith( cacheNetwork ); */
+
+    // 3. Network with cache fallback: busca en la web, si no responde busca en la cache
+    /*const responsePromise = fetch( event.request )
+        .then( response => {
+
+            if ( !response || !response.ok ) {
+                return caches.match( event.request );
+            }
+
+            console.log('Fetch', response );
+
+            // almacena en la cache
+            caches.open( APP_SHELL.CACHE_DYNAMIC )
+                .then( cache => {
+
+                    // console.log( cache );
+
+                    cache.put( event.request, response );
+
+                    cleanCache( APP_SHELL.CACHE_DYNAMIC, APP_SHELL.CACHE_DYNAMIC_LIMIT );
+                });
+
+            return response.clone();
+        })
+        .catch( error => {
+
+            console.log( error );
+
+            // revisamos en el cache
+            return caches.match( event.request );
+        });
+    
+    event.respondWith( responsePromise );*/
+
+    // 4. Cache with network update : el rendimiento es critico
+    // las actualizacion estan un paso atras
+    /*if ( event.request.url.includes('bootstrap') ) {
+
+        event.respondWith( caches.match( event.request ) );
+        return;
+    }
+
+    const responsePromise = caches.open( APP_SHELL.CACHE_STATIC )
+        .then( cache => {
+            
+            fetch( event.request ).then( response => {
+                cache.put( event.request, response );
+            });
+
+            return cache.match( event.request );
+        });
+
+    event.respondWith( responsePromise );*/
+
+    // 5. Cache y network race: es una carrera 
+    const responsePromise = new Promise(( resolve, reject ) => {
+        
+        let rejected = false;
+        
+        const failOneTime = () => {
+
+            if ( rejected ) {
+
+                // es una imagen que retorna
+                if ( ( /\.(png|jpg)/i ).test( event.request.url ) ) {
+                    resolve( caches.match('./img/no-img.jpg') );
+                
+                } else {
+                    reject('No se encontro respuesta');
+                
+                }
+
+            } else {
+                rejected = true;
+            }
+        }
+
+        fetch( event.request )
+            .then( response => {
+
+                if ( response && response.ok ) {
+                    resolve( response );
+                    return;
+                }
+
+                failOneTime();
+            })
+            .catch( failOneTime );
+
+            
+        caches.match( event.request )
+            .then( response => {
+
+                if ( response ) {
+                    resolve( response );
+                    return;
+                }
+
+                failOneTime();
+            })
+            .catch( failOneTime );
+    });
+
+
+    event.respondWith( responsePromise );
 });
 
 
