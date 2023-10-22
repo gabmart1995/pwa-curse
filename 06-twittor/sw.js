@@ -75,6 +75,7 @@ self.addEventListener('fetch', event => {
                     return updateDynamicCache( DYNAMIC_CACHE, event.request, newResponse );
                 });
         });
-
+    
+    // no olvidar la respuesta del fetch con un respondWith
     event.respondWith( promiseResponse );
 });
